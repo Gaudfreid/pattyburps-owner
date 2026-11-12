@@ -115,6 +115,7 @@ async function hpush(){if(!HUB.cfg()||!AU||HUB.pb)return;HUB.pb=true;
 async function hpull(){if(!HUB.cfg()||!AU||HUB.busy)return;HUB.busy=true;const before=inew();
  try{const rows=await hreq('/rest/v1/inquiries?select=*&order=created_at.desc&limit=200');
   (rows||[]).forEach(r=>{const i=INQ.findIndex(x=>x.id===r.id);if(i>=0&&INQ[i].dirty)return;const m=hfromRow(r);if(i>=0)INQ[i]=m;else INQ.push(m)});
+  if((rows||[]).length<200){const ids=new Set((rows||[]).map(r=>r.id));INQ=INQ.filter(x=>x.dirty||ids.has(x.id))}
   saveI();HUB.ok=true;HUB.err='';HUB.last=Date.now();
   if(inew()>before&&'vibrate'in navigator)try{navigator.vibrate(120)}catch(e){}}catch(e){HUB.err=e.message==='auth'?'auth':'net'}
  HUB.busy=false;hui()}
