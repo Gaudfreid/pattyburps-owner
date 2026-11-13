@@ -374,7 +374,18 @@ function impText(t){try{const d=JSON.parse(t);if(d.v!==1||!Array.isArray(d.order
 function impFile(i){const f=i.files[0];if(!f)return;const r=new FileReader();r.onload=()=>impText(r.result);r.readAsText(f)}
 function nvDraw(){document.getElementById('nv').innerHTML=['Home','Inbox','Sales','Inventory','Website','More'].map(t=>`<button class="${tab==t?'on':''}" onclick="go('${t}')">${ic(t)}${t==='Inbox'&&inew()?'Inbox · '+inew():t}</button>`).join('')}
 function draw(){load();const k=sub||tab;document.getElementById('m').innerHTML=V[k]();document.getElementById('m').scrollTop=0;nvDraw()}
-function go(t,s){tab=t;sub=s||null;draw()}draw();hstart();
+/* Phone back/swipe-back: keep our own page history so it goes to the previous page instead of closing the app */
+const HS=[];let HI=0;
+const hsnap=()=>({t:tab,s:sub,fi:FI,qi:QI,od:OD,ev:EV.cur});
+function hset(i,push){HI=i;HS.length=i+1;HS[i]=hsnap();try{history[push?'pushState':'replaceState']({i:i},'')}catch(e){}}
+function go(t,s){s=s||null;const cur=HS[HI]||{},prev=HS[HI-1];
+ if(cur.t===t&&cur.s===s){tab=t;sub=s;draw();return}
+ if(prev&&prev.t===t&&prev.s===s){history.back();return}
+ tab=t;sub=s;
+ if(!s&&!cur.s&&cur.t!=='Home')hset(HI,false);else hset(HI+1,true);
+ draw()}
+addEventListener('popstate',e=>{const i=e.state&&typeof e.state.i==='number'?e.state.i:0,x=HS[i];if(!x)return;HI=i;tab=x.t;sub=x.s;FI=x.fi;QI=x.qi;OD=x.od;EV.cur=x.ev;draw()});
+hset(0,false);draw();hstart();
 (function(){const s=document.getElementById('sp');if(!s)return;try{document.getElementById('spt').textContent=REAL?'Last updated '+ago(IMP.at):'Showing demo data';if(sessionStorage.getItem('pbs'))return s.remove();sessionStorage.setItem('pbs',1);setTimeout(()=>{s.classList.add('out');setTimeout(()=>s.remove(),400)},1100)}catch(e){s.remove()}})();
 </script><script>if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0)addEventListener('load',function(){navigator.serviceWorker.register('./sw.js').catch(function(){})})</script>
 </body></html>
