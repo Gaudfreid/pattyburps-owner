@@ -147,12 +147,12 @@ async function hpush(){if(!HUB.cfg()||!AU||HUB.pb)return;HUB.pb=true;
    else{await hreq('/rest/v1/inquiries?id=eq.'+encodeURIComponent(q.id),{method:'PATCH',body:JSON.stringify({st:q.st,fee:q.fee,courier:q.courier,cref:q.cref,notes:q.notes})});q.dirty=0}
    saveI()}HUB.err=''}catch(e){HUB.err=e.message==='auth'?'auth':'net'}
  HUB.pb=false;hui()}
-async function hpull(){if(!HUB.cfg()||!AU||HUB.busy)return;HUB.busy=true;const before=inew();
+async function hpull(){if(!HUB.cfg()||!AU||HUB.busy)return;HUB.busy=true;const before=inew(),bpt=iptm(),firstPull=!HUB.last;
  try{const rows=await hreq('/rest/v1/inquiries?select=*&order=created_at.desc&limit=200');
   (rows||[]).forEach(r=>{const i=INQ.findIndex(x=>x.id===r.id);if(i>=0&&INQ[i].dirty)return;const m=hfromRow(r);if(i>=0)INQ[i]=m;else INQ.push(m)});
   if((rows||[]).length<200){const ids=new Set((rows||[]).map(r=>r.id));INQ=INQ.filter(x=>x.dirty||ids.has(x.id))}
   saveI();HUB.ok=true;HUB.err='';HUB.last=Date.now();
-  if(inew()>before&&'vibrate'in navigator)try{navigator.vibrate(120)}catch(e){}}catch(e){HUB.err=e.message==='auth'?'auth':'net'}
+  if((inew()>before||(!firstPull&&iptm()>bpt))&&'vibrate'in navigator)try{navigator.vibrate(120)}catch(e){}}catch(e){HUB.err=e.message==='auth'?'auth':'net'}
  HUB.busy=false;hui()}
 async function hdata(){if(!HUB.cfg()||!AU||HUB.dbusy)return;HUB.dbusy=true;
  try{const since=new Date(Date.now()-90*864e5).toISOString();
@@ -196,7 +196,7 @@ const stl=q=>q.st==='cancelled'?'Cancelled':(STG(q).find(x=>x[0]===q.st)||ALLST.
 const refOf=q=>q&&q.src==='web'&&/^[0-9a-f]{8}-/i.test(String(q.id))?'PB-'+String(q.id).replace(/-/g,'').slice(0,8).toUpperCase():'';
 const nextOf=q=>STG(q).find(x=>(RK[x[0]]||0)>(RK[q.st]||0));
 const isub=q=>sum(q.items.map(i=>i.q*PR(i.n))),itot=q=>isub(q)+(q.svc==='pickup'?0:+q.fee||0);
-const ilist=()=>INQ.filter(q=>!((REAL||HUB.ok)&&q.src==='demo')),inew=()=>ilist().filter(q=>q.st==='new').length;
+const ilist=()=>INQ.filter(q=>!((REAL||HUB.ok)&&q.src==='demo')),inew=()=>ilist().filter(q=>q.st==='new').length,ipay=()=>ilist().filter(q=>q.pay==='gcash'&&q.pf&&q.st!=='cancelled'&&(RK[q.st]||0)<RK.paid).length,iptm=()=>ilist().reduce((m,q)=>Math.max(m,q.pt||0),0);
 let inf='Active',QI=null;
 function oq(id){QI=id;go('Inbox','InqD')}
 function uq(k,v,r){const q=INQ.find(x=>x.id===QI);if(!q)return;q[k]=v;q.dirty=1;saveI();hpush();if(r)draw()}
@@ -223,6 +223,7 @@ Home(){return `<div class="top">${logo}<span style="flex:1"></span><button class
 ${CFG.goal>0?`<div class="card"><div style="display:flex;justify-content:space-between"><b>Daily goal</b><span>${peso(TODAY)} of ${peso(CFG.goal)}</span></div><div class="gbar"><i style="width:${Math.min(100,Math.round(TODAY/CFG.goal*100))}%"></i></div><small style="color:var(--mut)">${TODAY>=CFG.goal?'Goal reached 🎉':peso(CFG.goal-TODAY)+' to go'}</small></div>`:''}
 <div class="row3"><div class="card"><span>Orders</span><b>${NORD}</b><span class="up" style="font-size:11px">${ar(CH.o)}</span></div><div class="card"><span>Avg. Order</span><b>${peso(AVG)}</b><span class="up" style="font-size:11px">${ar(CH.a)}</span></div><div class="card"><span>Top Seller</span><b style="font-size:14px;line-height:1.2;margin-top:6px">${TOP}</b></div></div>
 ${inew()?`<div class="card alert" style="display:flex;gap:10px;align-items:center" onclick="go('Inbox')"><span style="font-size:26px">🛎️</span><div><b>${inew()} new online order${inew()>1?'s':''}</b><small style="display:block">Tap to reply to your customer.</small></div></div>`:''}
+${ipay()?`<div class="card alert" style="display:flex;gap:10px;align-items:center" onclick="inf='Active';go('Inbox')"><span style="font-size:26px">\ud83d\udcf7</span><div><b>${ipay()} payment screenshot${ipay()>1?'s':''} to check</b><small style="display:block">Check your GCash app, then tap Mark as paid.</small></div></div>`:''}
 <div class="card"><h2>Sales Trend</h2>${bars(S7)}</div>
 ${LOW.length?`<div class="card alert" style="display:flex;gap:10px;align-items:center" onclick="go('Inventory')"><span style="font-size:26px">⚠️</span><div><b>Needs your attention</b><small style="display:block">${LOW.length} items need restocking</small></div></div>`:`<div class="card">✅ Nothing needs your attention.</div>`}`},
 Sales(){const v=SER(rng),t=TOT;
@@ -409,7 +410,7 @@ V.Website=function(){const site=/^https?:\/\//i.test(CFG.site||'')?CFG.site:'';
 ${site?`<a class="li" href="${esc(site)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><span style="font-size:20px">🌐</span><div class="g"><b>Open my website</b><small style="display:block;color:var(--mut)">${esc(site.replace(/^https?:\/\//i,''))}</small></div>↗</a>`:`<div class="li" onclick="go('More','Profile')"><span style="font-size:20px">🌐</span><div class="g"><b>Add your website address</b><small style="display:block;color:var(--mut)">So you can open your site from here</small></div>›</div>`}</div>`};
 function impText(t){try{const d=JSON.parse(t);if(d.v!==1||!Array.isArray(d.orders)||!Array.isArray(d.items))throw 0;IMP=d;try{localStorage.setItem(KEY,t)}catch(e){}go('Home')}catch(e){alert('That does not look like a Patty Burps POS export. Export it again from the POS Settings.')}}
 function impFile(i){const f=i.files[0];if(!f)return;const r=new FileReader();r.onload=()=>impText(r.result);r.readAsText(f)}
-function nvDraw(){document.getElementById('nv').innerHTML=['Home','Inbox','Sales','Inventory','Website','More'].map(t=>`<button class="${tab==t?'on':''}" onclick="go('${t}')">${ic(t)}${t==='Inbox'&&inew()?'Inbox · '+inew():t}</button>`).join('')}
+function nvDraw(){document.getElementById('nv').innerHTML=['Home','Inbox','Sales','Inventory','Website','More'].map(t=>`<button class="${tab==t?'on':''}" onclick="go('${t}')">${ic(t)}${t==='Inbox'&&(inew()+ipay())?'Inbox · '+(inew()+ipay()):t}</button>`).join('')}
 function draw(){load();const k=sub||tab;document.getElementById('m').innerHTML=V[k]();document.getElementById('m').scrollTop=0;nvDraw()}
 /* Phone back/swipe-back: keep our own page history so it goes to the previous page instead of closing the app */
 const HS=[];let HI=0;
