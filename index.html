@@ -156,7 +156,7 @@ async function hpull(){if(!HUB.cfg()||!AU||HUB.busy)return;HUB.busy=true;const b
  HUB.busy=false;hui()}
 async function hdata(){if(!HUB.cfg()||!AU||HUB.dbusy)return;HUB.dbusy=true;
  try{const since=new Date(Date.now()-90*864e5).toISOString();
-  const [os,its,exs]=await Promise.all([hreq('/rest/v1/orders?select=no,t,by,total,status,lines,meta&t=gte.'+encodeURIComponent(since)+'&order=t.desc&limit=1000'),hreq('/rest/v1/items?select=id,name,price,cost,stock,low,active&order=id'),hreq('/rest/v1/expenses?select=id,t,amount&t=gte.'+encodeURIComponent(since)+'&limit=1000').catch(function(e){if(e.message==='auth')throw e;return[]})]);
+  const [os,its,exs]=await Promise.all([hreq('/rest/v1/orders?select=no,t,by,total,status,lines,meta&t=gte.'+encodeURIComponent(since)+'&order=t.desc&limit=1000'),hreq('/rest/v1/items?select=id,name,price,cost,stock,low,active&order=id'),hreq('/rest/v1/expenses?select=id,t,amount&deleted=eq.false&t=gte.'+encodeURIComponent(since)+'&limit=1000').catch(function(e){if(e.message==='auth')throw e;return[]})]);
   const D={v:1,at:Date.now(),live:1,biz:'Patty Burps',ings:[],exp:(exs||[]).map(x=>({t:Date.parse(x.t),k:'exp',a:+x.amount||0})),
    items:(its||[]).map(i=>({name:i.name,stock:+i.stock||0,low:+i.low||0,price:+i.price||0,cost:+i.cost||0,img:i.id})),
    orders:(os||[]).map(o=>({no:o.no,t:Date.parse(o.t),by:o.by||'',cust:(o.meta&&o.meta.cust)||'',total:+o.total||0,st:o.status,lines:(Array.isArray(o.lines)?o.lines:[]).map(l=>({n:l.n,q:+l.q||0,t:+l.t||0,c:+l.c||0}))}))};
